@@ -108,8 +108,10 @@
 .open-account:disabled { opacity: 0.6; cursor: wait; }
 
 /* confirmation before opening another account (same look as the Deposit funds dialog) */
-.dialog-backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: #10171966; animation: fade-in 160ms ease-out; }
-.confirm-dialog { display: grid; gap: 12px; width: min(420px, 100%); padding: 24px; border: var(--card-border); border-radius: var(--radius); background: var(--surface); color: var(--ink); box-shadow: 0 20px 50px #10171933; animation: pop-in 220ms cubic-bezier(0.2, 0.7, 0.2, 1); }
+.confirm-dialog { width: min(420px, calc(100% - 32px)); padding: 0; border: var(--card-border); border-radius: var(--radius); background: var(--surface); color: var(--ink); box-shadow: 0 20px 50px #10171933; }
+.confirm-dialog[open] { animation: pop-in 220ms cubic-bezier(0.2, 0.7, 0.2, 1); }
+.confirm-dialog::backdrop { background: #10171966; animation: fade-in 160ms ease-out; }
+.confirm-content { display: grid; gap: 12px; padding: 24px; }
 .confirm-dialog h2 { margin: 0; font-family: var(--font-display); font-size: 1.1rem; font-weight: 800; }
 .confirm-dialog p { margin: 0; color: var(--muted); font-size: 0.8rem; }
 .confirm-error { padding: 10px 12px; border-radius: 9px; background: var(--red-soft); color: var(--red) !important; }

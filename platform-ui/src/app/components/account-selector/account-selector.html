@@ -28,17 +28,16 @@
   }
 </section>
 
-@if (confirming()) {
-  <div class="dialog-backdrop" (click)="cancelOpenAccount()" (keydown.escape)="cancelOpenAccount()">
-    <section class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="open-account-title" aria-describedby="open-account-text" (click)="$event.stopPropagation()">
-      <h2 id="open-account-title">Open a new account?</h2>
-      @if (openError()) {
-        <p class="confirm-error" role="alert">{{ openError() }}</p>
-      }
-      <div class="dialog-actions">
-        <button type="button" (click)="cancelOpenAccount()" [disabled]="opening()">Cancel</button>
-        <button type="button" class="primary" (click)="confirmOpenAccount()" [disabled]="opening()" autofocus>{{ opening() ? 'Opening…' : 'Yes, open account' }}</button>
-      </div>
-    </section>
-  </div>
-}
+<!-- a native modal dialog renders in the top layer, so the navbar's stacking context can't put it behind the page -->
+<dialog #confirmDialog class="confirm-dialog" role="alertdialog" aria-labelledby="open-account-title" (cancel)="onDialogCancel($event)" (click)="onDialogClick($event)">
+  <section class="confirm-content">
+    <h2 id="open-account-title">Open a new account?</h2>
+    @if (openError()) {
+      <p class="confirm-error" role="alert">{{ openError() }}</p>
+    }
+    <div class="dialog-actions">
+      <button type="button" (click)="cancelOpenAccount()" [disabled]="opening()">Cancel</button>
+      <button type="button" class="primary" (click)="confirmOpenAccount()" [disabled]="opening()" autofocus>{{ opening() ? 'Opening…' : 'Yes, open account' }}</button>
+    </div>
+  </section>
+</dialog>
