@@ -51,6 +51,9 @@ jobs:
           cd ~/f-trade
           before=$(git rev-parse HEAD)
           git pull --ff-only origin main
+          # Without this every build adds a record of how the image was built, timestamps included, which gives an
+          # unchanged image a new ID and makes compose recreate its containers on every deploy.
+          export BUILDX_NO_DEFAULT_ATTESTATIONS=1
           docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait
           # compose doesn't notice a changed Caddyfile, and the running container still has the old one
           if ! git diff --quiet "$before" HEAD -- Caddyfile; then
