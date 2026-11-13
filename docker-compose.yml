@@ -18,6 +18,8 @@ x-app: &app
       condition: service_healthy
     redis:
       condition: service_healthy
+    market-sim:
+      condition: service_healthy
   healthcheck:
     test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
     interval: 5s
@@ -39,6 +41,8 @@ x-app-environment: &app-environment
   MARKET_DATA_BASE_URL: ${MARKET_DATA_BASE_URL:?MARKET_DATA_BASE_URL is not set}
   MARKET_DATA_API_KEY: ${MARKET_DATA_API_KEY:?MARKET_DATA_API_KEY is not set}
   MARKET_DATA_CACHE_TTL: ${MARKET_DATA_CACHE_TTL:?MARKET_DATA_CACHE_TTL is not set}
+  # the app stops asking for prices at this many calls a day
+  MARKET_DATA_DAILY_LIMIT: ${MARKET_DATA_DAILY_LIMIT:?MARKET_DATA_DAILY_LIMIT is not set}
   SPRING_DATA_REDIS_HOST: redis
   SPRING_DATA_REDIS_PORT: 6379
   SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is not set}
@@ -65,6 +69,24 @@ x-reporting-environment: &reporting-environment
   ANALYTICS_DB_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER is not set}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is not set}@postgres:5432/analytics
 
 services:
+  # made-up prices, in place of Fauxnance; not published, only the app services call it
+  market-sim:
+    build:
+      context: ./market-sim
+      additional_contexts:
+        # sample-data.sql, which lists the instruments, is outside ./market-sim
+        project: .
+    image: trading-platform-market-sim
+    container_name: trading-market-sim
+    environment:
+      MARKET_DATA_API_KEY: ${MARKET_DATA_API_KEY:?MARKET_DATA_API_KEY is not set}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+    restart: unless-stopped
+
   kafka:
     # 3.9.1 matches the kafka-clients version the app uses
     image: apache/kafka:3.9.1

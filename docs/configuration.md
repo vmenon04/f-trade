@@ -25,6 +25,7 @@ Only ports **9092** and **8080–8100** on the Linux machine are reachable from 
 
 | Service | Image | Does |
 |---|---|---|
+| `market-sim` | `trading-platform-market-sim` (built from `market-sim/Dockerfile`) | Simulated market data with the same endpoints as Fauxnance. Prices are made up, worked out from the symbol and the time, so it stores nothing. Not published. To use a real Fauxnance instead, change `MARKET_DATA_BASE_URL` and `MARKET_DATA_API_KEY` |
 | `kafka` | `apache/kafka:3.9.1` | Broker |
 | `postgres` | `postgres:16-alpine` | Database; runs `schema.sql` + `sample-data.sql` + `auth_test_data.sql` + `efe_demo_history.sql` (a year of made-up past trades for `efe`, for the performance chart; run it by hand to add it to an existing database, see its header) + `staff_users.sql` (the `analyst` and `admin` logins) + `reporting/analytics_database.sql` (creates the `analytics` database) once, only when its volume is empty |
 | `redis` | `redis:7.4-alpine` | Fauxnance price cache, daily price history (the dashboard's performance chart, kept until midnight UTC) and daily call count, the Finnhub news cache, and the last hour's trades as they go through (the trade page's live list); password-protected, kept on disk (append-only file) so the count survives a restart |
@@ -56,8 +57,9 @@ Once every service is up and answering, the `ready` service prints the app's add
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Database name and login |
 | `POSTGRES_PORT` | Host port for Postgres (`8082`) |
 | `API_PORT` | Host port for the `api` service (`8081`) |
-| `MARKET_DATA_BASE_URL`, `MARKET_DATA_API_KEY` | Fauxnance price API |
-| `MARKET_DATA_CACHE_TTL` | How long a price stays cached (`5m`) |
+| `MARKET_DATA_BASE_URL`, `MARKET_DATA_API_KEY` | Price API: `market-sim` by default (`http://market-sim:8090/v1`), with any long random key |
+| `MARKET_DATA_CACHE_TTL` | How long a price stays cached (`30s`) |
+| `MARKET_DATA_DAILY_LIMIT` | Price API calls allowed a day (`1000000` for `market-sim`, which has no quota) |
 | `FINNHUB_API_KEY` | Finnhub key for the dashboard's market news (optional: without it there is no news) |
 | `REDIS_PORT`, `REDIS_PASSWORD` | Host port (`8083`) and password for Redis |
 | `JWT_SHARED_SECRET` | Secret login tokens are signed (auth-service, as its `JWT_SECRET`) and checked (the app and the reporting API) with, at least 32 characters |
