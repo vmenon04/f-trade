@@ -10,7 +10,7 @@
         <relativePath />
     </parent>
 
-    <groupId>com.neueda.leap</groupId>
+    <groupId>com.fintechfive.ftrade</groupId>
     <artifactId>fintech-five</artifactId>
     <version>0.1.0</version>
     <packaging>jar</packaging>
