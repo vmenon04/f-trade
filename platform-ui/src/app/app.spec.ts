@@ -39,21 +39,19 @@ describe('App', () => {
     expect(compiled.querySelector('app-navbar')).toBeNull();
   });
 
-  it('should say so on the plain HTML version, with the way back', async () => {
+  it('should say so on the plain HTML version, and only there', async () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;
     const plain = TestBed.inject(PlainStyleService);
-    const back = () => Array.from(compiled.querySelectorAll('button')).find((b) => b.textContent?.includes('modern site'));
-    expect(back()).toBeUndefined();
+    expect(compiled.textContent).not.toContain('the plain HTML edition');
 
     plain.toggle();
     await fixture.whenStable();
     expect(compiled.textContent).toContain('the plain HTML edition');
 
-    back()!.click();
+    plain.toggle();
     await fixture.whenStable();
-    expect(plain.on()).toBe(false);
-    expect(back()).toBeUndefined();
+    expect(compiled.textContent).not.toContain('the plain HTML edition');
   });
 });

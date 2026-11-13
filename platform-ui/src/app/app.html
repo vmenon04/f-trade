@@ -1,12 +1,5 @@
 @if (plain.on()) {
-  <p>
-    <b>F-Trade</b>, the plain HTML edition.
-    @if (plain.always) {
-      <a [href]="plain.modernUrl()">Go to the modern site</a>
-    } @else {
-      <button type="button" (click)="plain.toggle()">Switch to the modern site</button>
-    }
-  </p>
+  <p><b>F-Trade</b>, the plain HTML edition.</p>
   <hr>
 }
 @if (fullPage()) {

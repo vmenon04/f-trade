@@ -33,7 +33,8 @@ export function isRetroHost(hostname: string): boolean {
 
 // The plain HTML version of the site: every style sheet switched off, so the same pages are drawn the way a
 // browser draws bare HTML, plus the few rules above. It has an address of its own, where it is always on. On the
-// site's usual address it is a hidden extra (the landing page's frog switches it), and off again after a reload.
+// site's usual address it is a hidden extra (the landing page's frog switches it on and off), and off again after
+// a reload. Neither has a visible switch.
 @Injectable({ providedIn: 'root' })
 export class PlainStyleService {
   private readonly doc = inject(DOCUMENT);
@@ -45,12 +46,6 @@ export class PlainStyleService {
 
   constructor() {
     this.apply(this.on());
-  }
-
-  /** The same page on the site's usual address, for the way back from the plain site's own. */
-  modernUrl(): string {
-    const { protocol, host, pathname, search } = this.doc.location;
-    return `${protocol}//${host.slice(RETRO_LABEL.length + 1)}${pathname}${search}`;
   }
 
   toggle(): void {
