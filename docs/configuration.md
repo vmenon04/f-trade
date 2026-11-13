@@ -121,13 +121,27 @@ Created by `KafkaTopicConfig` at startup (`PARTITIONS = 8`, replication 1). The 
 
 ## CI (Jenkins, `Jenkinsfile`)
 
-Builds are started manually. Stages: Build Image → Smoke-Test → (Code-Coverage, Static-Analysis, Reporting-Tests in parallel) → SonarQube.
+Stages: Build Image → Smoke-Test → (Code-Coverage, Static-Analysis, Reporting-Tests in parallel) → SonarQube.
+
+On the public server, Jenkins and SonarQube run from `../docker-compose.ci.yml` (`docker compose -f docker-compose.ci.yml up -d --build`), as their own compose project on the platform's network. Caddy serves them at `jenkins.SITE_DOMAIN` and `sonar.SITE_DOMAIN`. Jenkins is set up from `../ci/jenkins`: `plugins.txt`, and `casc.yaml` for the settings, the logins and the `ftrade` job, which looks for new commits every five minutes, builds every branch of the repo (never pull requests from forks) and reports each build on its commit on GitHub. Anyone can look at builds; only the admin login can change anything. The table below still describes the first setup, on the Linux machine.
+
+| `.env` (CI only) | Meaning |
+|---|---|
+| `DOCKER_GID` | The server's docker group (`getent group docker \| cut -d: -f3`), so Jenkins may use the Docker socket |
+| `JENKINS_ADMIN_USER`, `JENKINS_ADMIN_PASSWORD` | The Jenkins admin login |
+| `JENKINS_GITHUB_TOKEN` | GitHub token for this repo: Contents read, Commit statuses read and write, Pull requests read |
+| `SONAR_DB_PASSWORD` | Password of SonarQube's own Postgres |
+| `SONAR_TOKEN` | Analysis token made in SonarQube after its first start |
+
+Once on the server, before the first start: `sudo mkdir -p /var/jenkins_home && sudo chown 1000:1000 /var/jenkins_home` (Jenkins's files, at the same path as in the container) and `echo 'vm.max_map_count=524288' | sudo tee /etc/sysctl.d/99-sonarqube.conf && sudo sysctl --system` (SonarQube's search engine).
+
+The smoke test joins the platform's network (`trading-platform_default`) to reach Kafka, so the platform has to be running.
 
 | Item | Value |
 |---|---|
 | Jenkins tools | Maven `Maven3`, SonarQube scanner `Sonar`, server `SonarQube` |
 | Image | `fintech-five:<branch>` |
-| Smoke test | Throwaway `postgres:17-alpine` + the image with `SPRING_SQL_INIT_MODE=always`, Kafka listeners off (`SPRING_KAFKA_LISTENER_AUTO_STARTUP=false`), dummy market data and JWT secret; waits for `/actuator/health` UP |
+| Smoke test | Throwaway `postgres:17-alpine` + the image with `SPRING_SQL_INIT_MODE=always`, Kafka listeners off (`SPRING_KAFKA_LISTENER_AUTO_STARTUP=false`), dummy market data and JWT secret; waits up to four minutes for `/actuator/health` UP |
 | Static analysis | Checkstyle (`config/checkstyle.xml`) + SpotBugs; new issues mark the build UNSTABLE |
 | Coverage | JaCoCo (`target/site/jacoco/jacoco.xml`) |
 | SonarQube | Project key `fintech-five`, at `http://10.18.64.177:8085` |

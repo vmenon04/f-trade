@@ -4,3 +4,13 @@
 	encode gzip
 	reverse_proxy frontend:80
 }
+
+# Jenkins and SonarQube (docker-compose.ci.yml), each under its own name. Any name ending in SITE_DOMAIN leads to this
+# server when it is a duckdns.org name. Until they are started, these two just answer 502.
+jenkins.{$SITE_DOMAIN} {
+	reverse_proxy jenkins:8080
+}
+
+sonar.{$SITE_DOMAIN} {
+	reverse_proxy sonarqube:9000
+}

@@ -1,0 +1,23 @@
+# No versions: each image build takes the newest release that works with the Jenkins version in the Dockerfile.
+
+# set Jenkins up from casc.yaml, including the ftrade job
+configuration-as-code
+job-dsl
+matrix-auth
+
+# pipelines, from the Jenkinsfile of each branch on GitHub; also reports each build on the commit
+workflow-aggregator
+pipeline-stage-view
+git
+github-branch-source
+# the Reporting-Tests stage runs inside a python container
+docker-workflow
+
+# what the Jenkinsfile's stages publish
+junit
+coverage
+warnings-ng
+sonar
+
+# the build badge in the README
+embeddable-build-status
