@@ -1,11 +1,12 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
 import { Navbar } from './components/navbar/navbar';
+import { PriceTicker } from './components/price-ticker/price-ticker';
 import { PlainStyleService } from './services/plain-style.service';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, Navbar],
+  imports: [RouterOutlet, Navbar, PriceTicker],
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
