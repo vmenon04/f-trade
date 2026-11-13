@@ -1,8 +1,14 @@
+@if (plain.on()) {
+  <p><b>F-Trade</b>, the plain HTML edition.</p>
+  <app-price-ticker></app-price-ticker>
+  <hr>
+}
 @if (fullPage()) {
   <main class="auth-content"><router-outlet></router-outlet></main>
 } @else {
   <div class="app-shell">
     <app-navbar></app-navbar>
+    @if (plain.on()) { <hr> }
     <main class="app-content">
       <p class="simulated-notice">Demo: prices are simulated, not real market data.</p>
       <router-outlet></router-outlet>

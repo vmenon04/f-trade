@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { Component } from '@angular/core';
 import { provideRouter, Router } from '@angular/router';
 import { App } from './app';
+import { PlainStyleService } from './services/plain-style.service';
 
 @Component({ template: '' })
 class Blank {}
@@ -36,5 +37,21 @@ describe('App', () => {
     await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('app-navbar')).toBeNull();
+  });
+
+  it('should say so on the plain HTML version, and only there', async () => {
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const plain = TestBed.inject(PlainStyleService);
+    expect(compiled.textContent).not.toContain('the plain HTML edition');
+
+    plain.toggle();
+    await fixture.whenStable();
+    expect(compiled.textContent).toContain('the plain HTML edition');
+
+    plain.toggle();
+    await fixture.whenStable();
+    expect(compiled.textContent).not.toContain('the plain HTML edition');
   });
 });

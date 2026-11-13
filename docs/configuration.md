@@ -7,6 +7,7 @@ The platform runs on one public server (an ARM virtual machine on Oracle Cloud, 
 | Address | What |
 |---|---|
 | `https://f-trade.duckdns.org` | The web app: Caddy → `frontend` (nginx), which serves platform-ui and forwards `/v1`, `/auth` and `/api` to the trade API, auth-service and the reporting API |
+| `https://retro.f-trade.duckdns.org` | The same web app as plain HTML: every style sheet off, the way a browser draws a bare page. It is a separate site to the browser, so a login on one doesn't carry over to the other. On the usual address, five quick clicks on the landing page's frog switch to it until the page is reloaded |
 | `https://jenkins.f-trade.duckdns.org` | Jenkins (multibranch job `ftrade`). Anyone can look; changing anything needs the admin login |
 | `https://sonar.f-trade.duckdns.org` | SonarQube (project `fintech-five`) |
 
@@ -73,7 +74,7 @@ Once every service is up and answering, the `ready` service prints the app's add
 
 | Change | Why |
 |---|---|
-| `caddy` service (`caddy:2-alpine`, ports 80 and 443) | HTTPS for `SITE_DOMAIN`, `jenkins.SITE_DOMAIN` and `sonar.SITE_DOMAIN` (`../Caddyfile`); gets its certificates from Let's Encrypt by itself |
+| `caddy` service (`caddy:2-alpine`, ports 80 and 443) | HTTPS for `SITE_DOMAIN`, `retro.SITE_DOMAIN`, `jenkins.SITE_DOMAIN` and `sonar.SITE_DOMAIN` (`../Caddyfile`); gets its certificates from Let's Encrypt by itself |
 | `HOST_IP=127.0.0.1` in `.env` | Every published port is only reachable on the server itself |
 | Kafka advertises `kafka:9092`, and the app services, `reporting-consumer` and `kafka-ui` connect to it | `127.0.0.1` inside a container is the container itself |
 | `JAVA_TOOL_OPTIONS=-Xmx512m` on the app services, `KAFKA_HEAP_OPTS` on Kafka | Each JVM would otherwise allow itself a quarter of the server's memory |

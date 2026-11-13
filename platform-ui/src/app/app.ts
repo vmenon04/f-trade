@@ -1,15 +1,19 @@
-import { Component, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
 import { Navbar } from './components/navbar/navbar';
+import { PriceTicker } from './components/price-ticker/price-ticker';
+import { PlainStyleService } from './services/plain-style.service';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, Navbar],
+  imports: [RouterOutlet, Navbar, PriceTicker],
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
 export class App {
   protected readonly title = signal('platform-ui');
+  // the plain HTML version of the site: a line at the top of every page says so
+  protected readonly plain = inject(PlainStyleService);
 
   constructor(protected readonly router: Router) {}
 

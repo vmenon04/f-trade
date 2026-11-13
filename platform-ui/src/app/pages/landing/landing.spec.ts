@@ -1,7 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { PlainStyleService } from '../../services/plain-style.service';
 import { FLY_COUNT, FrogGame } from './frog-game';
-import { Landing } from './landing';
+import { FROG_CLICKS, Landing } from './landing';
 
 describe('Landing', () => {
   let fixture: ComponentFixture<Landing>;
@@ -32,6 +33,37 @@ describe('Landing', () => {
     fixture.nativeElement.querySelector('g.frog').dispatchEvent(new MouseEvent('click'));
     await fixture.whenStable();
     expect(fixture.nativeElement.querySelector('.ribbit').textContent).toContain('Ribbit');
+  });
+
+  it('switches to the plain HTML version after enough quick clicks on the frog, and back the same way', async () => {
+    const plain = TestBed.inject(PlainStyleService);
+    const click = (selector: string) => fixture.nativeElement.querySelector(selector).dispatchEvent(new MouseEvent('click'));
+
+    for (let i = 1; i < FROG_CLICKS; i++) click('g.frog');
+    expect(plain.on()).toBe(false);
+    click('g.frog');
+    await fixture.whenStable();
+    expect(plain.on()).toBe(true);
+
+    for (let i = 0; i < FROG_CLICKS; i++) click('pre');
+    await fixture.whenStable();
+    expect(plain.on()).toBe(false);
+    expect(fixture.nativeElement.querySelector('g.frog')).toBeTruthy();
+  });
+
+  it('draws the frog in text on the plain HTML version, with the same links', async () => {
+    const plain = TestBed.inject(PlainStyleService);
+    plain.toggle();
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector('svg')).toBeNull();
+    expect(fixture.nativeElement.querySelector('pre').textContent).toContain('(o)-------(o)');
+    const hrefs = Array.from(fixture.nativeElement.querySelectorAll('a') as NodeListOf<HTMLAnchorElement>)
+      .map((a) => a.getAttribute('href'));
+    expect(hrefs).toContain('/login');
+    expect(hrefs).toContain('/registration');
+
+    plain.toggle();
   });
 });
 

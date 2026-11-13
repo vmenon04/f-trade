@@ -1,3 +1,14 @@
+@if (plain.on()) {
+  <div align="center">
+    <h1>F-Trade</h1>
+    <!-- left-aligned inside the centred block, or each line of the drawing would be centred by itself -->
+    <pre style="display: inline-block; text-align: left" aria-label="A frog watching a fly with a dollar sign on it" (click)="countFrogClick()">{{ asciiFrog }}</pre>
+    <p>F-Trade is a trading platform: open an account, fund it, place buy and sell orders at live prices, and follow your portfolio and the market news in one place.</p>
+    <p><a routerLink="/registration">Create an account</a> | <a routerLink="/login">Log in</a></p>
+    <hr>
+    <p><i>Not a real brokerage.</i></p>
+  </div>
+} @else {
 <div class="landing">
   <header class="landing-nav">
     <a routerLink="/" class="landing-logo" aria-label="F-Trade home"><img src="assets/nav-bar-logo.png" alt="F-Trade"></a>
@@ -123,3 +134,4 @@
     <p>Not a real brokerage.</p>
   </footer>
 </div>
+}
