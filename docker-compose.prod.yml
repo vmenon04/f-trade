@@ -15,6 +15,11 @@ x-app-environment: &app-environment
   <<: *kafka-environment
   JAVA_TOOL_OPTIONS: -Xmx512m
 
+# the four stages start at the same time and share the server's cores, so each takes a few minutes to answer:
+# 60 tries is five minutes, where docker-compose.yml allows two
+x-app-healthcheck: &app-healthcheck
+  retries: 60
+
 services:
   caddy:
     image: caddy:2-alpine
@@ -40,15 +45,19 @@ services:
 
   api:
     environment: *app-environment
+    healthcheck: *app-healthcheck
 
   validation:
     environment: *app-environment
+    healthcheck: *app-healthcheck
 
   recording:
     environment: *app-environment
+    healthcheck: *app-healthcheck
 
   execution:
     environment: *app-environment
+    healthcheck: *app-healthcheck
 
   reporting-consumer:
     environment:
