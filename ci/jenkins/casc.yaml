@@ -89,9 +89,9 @@ jobs:
             interval('5m')
           }
         }
+        // a branch deleted on GitHub goes at the next look, builds and all, instead of staying crossed out
         orphanedItemStrategy {
           discardOldItems {
-            numToKeep(5)
           }
         }
       }
