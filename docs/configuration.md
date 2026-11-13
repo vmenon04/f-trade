@@ -1,27 +1,45 @@
 # Configuration
 
-## Machines and ports
+## Where it runs
 
-Only ports **9092** and **8080–8100** on the Linux machine are reachable from the VM.
+The platform runs on one public server (an ARM virtual machine on Oracle Cloud, Ubuntu), from the compose files at the repo root. Only ports 22, 80 and 443 are open to the internet, and Caddy, on 80 and 443, is the only way in to the platform:
 
-| Machine | Port | What |
-|---|---|---|
-| Linux (`10.18.64.177`) | 8080 | Jenkins (host service, multibranch job `ftrade`) |
-| | 8081 | Trade API (`api` container → 8080 inside) |
-| | 8082 | Postgres (`trading-postgres` → 5432 inside) |
-| | 8083 | Redis price cache (`trading-redis` → 6379 inside) |
-| | 8084 | auth-service: login, registration, token refresh (`trading-auth` → 3000 inside) |
-| | 8085 | SonarQube (standalone container, not in compose) |
-| | 8086 | Redis Insight, web UI for Redis (`trading-redis-insight`, `tools` profile only) |
-| | 8087 | Kafbat UI, web UI for Kafka (`trading-kafka-ui`, `tools` profile only) |
-| | 8088 | Adminer, web UI for Postgres (`trading-adminer`, `tools` profile only) |
-| | 8089 | Web app (`trading-frontend`, nginx → 80 inside): platform-ui, plus `/v1`, `/auth` and `/api` forwarded to the trade API, auth-service and the reporting API |
-| | 9092 | Kafka (`trading-kafka`, KRaft; controller on 9093 inside only) |
-| Windows VM | 8081 | The app when run locally (`server.port`; 8080 is taken by another Jenkins) |
-| Local | 8050 | Reporting API (`reporting/scripts/api.py`, 127.0.0.1) |
-| | 4200 | platform-ui dev server (`ng serve`): proxies `/v1` and `/auth` to the Linux machine and `/api` to 8050 (`REPORTING_HOST` / `REPORTING_PORT`) |
+| Address | What |
+|---|---|
+| `https://f-trade.duckdns.org` | The web app: Caddy → `frontend` (nginx), which serves platform-ui and forwards `/v1`, `/auth` and `/api` to the trade API, auth-service and the reporting API |
+| `https://jenkins.f-trade.duckdns.org` | Jenkins (multibranch job `ftrade`). Anyone can look; changing anything needs the admin login |
+| `https://sonar.f-trade.duckdns.org` | SonarQube (project `fintech-five`) |
 
-## Docker Compose (`../docker-compose.yml`, Linux machine)
+Everything else is published on the server's `127.0.0.1` only (`HOST_IP` in `.env`). To use one of these from your own machine, forward it over SSH, e.g. `ssh -L 8088:127.0.0.1:8088 ubuntu@<server>` and then open `http://localhost:8088`.
+
+| Port (on `HOST_IP`) | What |
+|---|---|
+| 8081 | Trade API (`api` container → 8080 inside) |
+| 8082 | Postgres (`trading-postgres` → 5432 inside) |
+| 8083 | Redis price cache (`trading-redis` → 6379 inside) |
+| 8084 | auth-service: login, registration, token refresh (`trading-auth` → 3000 inside) |
+| 8086 | Redis Insight, web UI for Redis (`trading-redis-insight`, `tools` profile only) |
+| 8087 | Kafbat UI, web UI for Kafka (`trading-kafka-ui`, `tools` profile only) |
+| 8088 | Adminer, web UI for Postgres (`trading-adminer`, `tools` profile only) |
+| 8089 | Web app (`trading-frontend`, nginx → 80 inside), without Caddy and HTTPS |
+| 9092 | Kafka (`trading-kafka`, KRaft; controller on 9093 inside only) |
+
+When developing on your own machine:
+
+| Port | What |
+|---|---|
+| 8050 | Reporting API run by hand (`reporting/scripts/api.py`, 127.0.0.1) |
+| 4200 | platform-ui dev server (`ng serve`): proxies `/v1` and `/auth` to the machine running compose (`BACKEND_HOST`, see `platform-ui/proxy.conf.mjs`) and `/api` to 8050 (`REPORTING_HOST` / `REPORTING_PORT`) |
+
+## Docker Compose
+
+| File | What |
+|---|---|
+| `../docker-compose.yml` | The platform. Enough by itself on any machine: `docker compose up -d` |
+| `../docker-compose.prod.yml` | What the public server changes, used on top of the first: `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build` |
+| `../docker-compose.ci.yml` | Jenkins and SonarQube, their own compose project (see CI below) |
+
+### Services (`../docker-compose.yml`)
 
 | Service | Image | Does |
 |---|---|---|
@@ -43,17 +61,30 @@ Only ports **9092** and **8080–8100** on the Linux machine are reachable from 
 | `adminer` | `adminer:6.1.2` | Web UI for Postgres: browse tables, run SQL. Log in with `POSTGRES_USER` / `POSTGRES_PASSWORD`. `tools` profile only |
 | `ready` | `alpine:3.20` | Waits until every other service is up, prints where to find the app (`docker compose logs ready`), then idles. It stays running because `docker compose up --wait` counts any container that exits as a failure |
 
-All four app services use the one image built from `Dockerfile`; each switches on only its own stage. Scale one with `docker compose up -d --scale execution=3` (at most 8 per stage get work, one per partition). Reset the database with `docker compose down -v`.
+All four app services use the one image built from `Dockerfile`, and the three reporting services the one built from `reporting/Dockerfile`; each app service switches on only its own stage. Only `api` and `reporting-api` build their image and the others use it. Built once, an unchanged image keeps its ID, so compose leaves its containers running. Scale one with `docker compose up -d --scale execution=3` (at most 8 per stage get work, one per partition). Reset the database with `docker compose down -v`.
 
 Once every service is up and answering, the `ready` service prints the app's addresses: in the log of a plain `docker compose up`, or with `docker compose logs ready` after `docker compose up -d --wait`.
 
 `docker compose up -d` leaves out the three web UIs; `docker compose --profile tools up -d` starts them too. Redis Insight and Kafka UI have no login.
 
+### On the public server (`../docker-compose.prod.yml`)
+
+| Change | Why |
+|---|---|
+| `caddy` service (`caddy:2-alpine`, ports 80 and 443) | HTTPS for `SITE_DOMAIN`, `jenkins.SITE_DOMAIN` and `sonar.SITE_DOMAIN` (`../Caddyfile`); gets its certificates from Let's Encrypt by itself |
+| `HOST_IP=127.0.0.1` in `.env` | Every published port is only reachable on the server itself |
+| Kafka advertises `kafka:9092`, and the app services, `reporting-consumer` and `kafka-ui` connect to it | `127.0.0.1` inside a container is the container itself |
+| `JAVA_TOOL_OPTIONS=-Xmx512m` on the app services, `KAFKA_HEAP_OPTS` on Kafka | Each JVM would otherwise allow itself a quarter of the server's memory |
+| The app services' health check allows five minutes | The four start at the same time and share the server's cores |
+
+nginx in `frontend` looks the services behind it up again every few seconds, so it follows a container that compose has recreated (see `platform-ui/nginx.conf`).
+
 ### `.env` (read by compose and the reporting scripts)
 
 | Variable | Used for |
 |---|---|
-| `HOST_IP` | Linux machine's private IP: ports are published on it, Kafka advertises it |
+| `HOST_IP` | The address ports are published on, and the one Kafka advertises: `127.0.0.1` on the public server (where `docker-compose.prod.yml` makes Kafka advertise `kafka:9092` instead), or the machine's own IP to reach the services from other machines |
+| `SITE_DOMAIN` | Public server only: the name the web app is served at (`f-trade.duckdns.org`) |
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Database name and login |
 | `POSTGRES_PORT` | Host port for Postgres (`8082`) |
 | `API_PORT` | Host port for the `api` service (`8081`) |
@@ -65,13 +96,15 @@ Once every service is up and answering, the `ready` service prints the app's add
 | `JWT_SHARED_SECRET` | Secret login tokens are signed (auth-service, as its `JWT_SECRET`) and checked (the app and the reporting API) with, at least 32 characters |
 | `AUTH_PORT` | Host port for auth-service (`8084`) |
 | `REDIS_INSIGHT_PORT`, `KAFKA_UI_PORT`, `ADMINER_PORT` | Host ports for the web UIs (`8086`, `8087`, `8088`) |
+| `UI_PORT` | Host port for the web app (`8089`) |
+| `LOGO_DEV_CRED_KEY` | logo.dev publishable key for company and coin logos (optional: logos fall back to the ticker's first letter) |
 | `MISSION_DB_URL`, `ANALYTICS_DB_URL` | Reporting run by hand (`reporting/scripts`): trading database (read-only) and analytics database. Compose sets both itself from the Postgres settings |
 
 ### Environment variables set on the app containers
 
 | Variable | Value |
 |---|---|
-| `SPRING_KAFKA_BOOTSTRAP_SERVERS` | `${HOST_IP}:9092` |
+| `SPRING_KAFKA_BOOTSTRAP_SERVERS` | `${HOST_IP}:9092` (`kafka:9092` on the public server) |
 | `SPRING_DATASOURCE_URL` | `jdbc:postgresql://postgres:5432/${POSTGRES_DB}` |
 | `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` | from `.env` |
 | `SPRING_SQL_INIT_MODE` | `never` (Postgres creates the schema; `schema.sql` drops every table) |
@@ -90,17 +123,17 @@ Note that every property can also be set as an environment variable (`spring.kaf
 
 | Property | Meaning |
 |---|---|
-| `server.port` | HTTP port (`8081` on the VM) |
-| `spring.kafka.bootstrap-servers` | `10.18.64.177:9092` |
-| `spring.datasource.url` / `.username` / `.password` | `jdbc:postgresql://10.18.64.177:8082/trading` |
+| `server.port` | HTTP port (`8081` in `application.properties.example`) |
+| `spring.kafka.bootstrap-servers` | Kafka, at `HOST_IP` of the machine running compose, e.g. `127.0.0.1:9092` |
+| `spring.datasource.url` / `.username` / `.password` | Postgres on `POSTGRES_PORT`, e.g. `jdbc:postgresql://127.0.0.1:8082/trading` |
 | `spring.sql.init.mode` | `always` drops and reloads every table on start. Use `never` against the shared database |
 | `spring.sql.init.data-locations` | `classpath:sample-data.sql` (with `always`) |
-| `market.data.base-url`, `market.data.api-key` | Fauxnance |
+| `market.data.base-url`, `market.data.api-key` | The price API. `market-sim` isn't published by compose, so run it by hand (`MARKET_DATA_API_KEY=<the same key> INSTRUMENTS_SQL=src/main/resources/sample-data.sql python market-sim/server.py`, port 8090, so `http://127.0.0.1:8090/v1`) or point this at a real Fauxnance |
 | `market.data.cache-ttl` | How long a price stays in the Redis cache, e.g. `5m` |
 | `news.api-key` | Finnhub key for market news (optional: without it there is no news) |
 | `news.cache-ttl` | How long news stays in the Redis cache (default `10m`) |
-| `spring.data.redis.host` / `.port` / `.password` | `10.18.64.177`, `8083`, and `REDIS_PASSWORD` from `.env` |
-| `management.health.redis.enabled` | `false`: if Redis is down, prices come straight from Fauxnance |
+| `spring.data.redis.host` / `.port` / `.password` | Redis on `REDIS_PORT`, e.g. `127.0.0.1`, `8083`, and `REDIS_PASSWORD` from `.env` |
+| `management.health.redis.enabled` | `false`: if Redis is down, prices come straight from the price API |
 | `jwt.shared-secret` | Same value as `JWT_SHARED_SECRET` in `.env`. Every endpoint except `/actuator/health` needs a login token signed with it |
 | `trade.stage.{api,validation,recording,execution}.enabled` | Which stages run; unset counts as `true` |
 | `spring.kafka.listener.concurrency` | Optional: listener threads per stage (default 1) |
@@ -119,30 +152,43 @@ Note that every property can also be set as an environment variable (`spring.kaf
 
 Created by `KafkaTopicConfig` at startup (`PARTITIONS = 8`, replication 1). The first three are keyed by account ID, so each account's trades stay in order; `trade.accepted` and `trade.finished` are keyed by trade ID and `trade.rejected` by external trade ID. `trade-tracker` runs in the `api` container and keeps each trade's steps in Redis for `GET /v1/accounts/{accountId}/trades/live`.
 
-## CI (Jenkins, `Jenkinsfile`)
+## Deploys (GitHub Actions, `../.github/workflows/deploy.yml`)
+
+Every push to `main`, or a run started by hand from the Actions tab, deploys to the public server. The run logs in over SSH and, in `~/f-trade`, pulls `main` and runs `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait`: compose rebuilds what changed and recreates only those containers, and the run fails unless every service comes back healthy. The images are built on the server; nothing is pushed to a registry. Each run is listed under Deployments on the repo's page (environment `production`).
+
+| Item | Value |
+|---|---|
+| Secrets | `DEPLOY_HOST` (the server's IP), `DEPLOY_SSH_KEY` (a private key the server's `ubuntu` user accepts), `DEPLOY_KNOWN_HOSTS` (the server's host key, from `ssh-keyscan -t ed25519 <the IP>`) |
+| `.env` | Only on the server, in `~/f-trade`; never in git or in the workflow |
+| `BUILDX_NO_DEFAULT_ATTESTATIONS=1` | Stops each build adding a record of how the image was built, which would give an unchanged image a new ID and recreate its containers |
+| Caddy | Restarted when `Caddyfile` changed, because compose doesn't notice and the running container still has the old file |
+
+Jenkins and SonarQube are not part of a deploy. After a change to `ci/jenkins` or `docker-compose.ci.yml`, run `docker compose -f docker-compose.ci.yml up -d --build` on the server.
+
+## CI (Jenkins, `../Jenkinsfile`)
 
 Stages: Build Image → Smoke-Test → (Code-Coverage, Static-Analysis, Reporting-Tests in parallel) → SonarQube.
 
-On the public server, Jenkins and SonarQube run from `../docker-compose.ci.yml` (`docker compose -f docker-compose.ci.yml up -d --build`), as their own compose project on the platform's network. Caddy serves them at `jenkins.SITE_DOMAIN` and `sonar.SITE_DOMAIN`. Jenkins is set up from `../ci/jenkins`: `plugins.txt`, and `casc.yaml` for the settings, the logins and the `ftrade` job, which looks for new commits every five minutes, builds every branch of the repo (never pull requests from forks) and reports each build on its commit on GitHub. Anyone can look at builds; only the admin login can change anything. The table below still describes the first setup, on the Linux machine.
+Jenkins and SonarQube run on the public server from `../docker-compose.ci.yml` (`docker compose -f docker-compose.ci.yml up -d --build`), as their own compose project on the platform's network, where Caddy reaches them and the smoke test reaches Kafka. So the platform has to be running first.
+
+Jenkins is set up from `../ci/jenkins`, not by hand: `Dockerfile` (JDK 25, Maven, the Docker client), `plugins.txt`, and `casc.yaml` for the settings, the logins and the `ftrade` job. Changes made on its pages are lost when it restarts. The job looks for new commits every five minutes, builds every branch of the repo (never pull requests from forks), reports each build on its commit on GitHub, and forgets a branch once it is deleted there. Builds run on the server's own Docker, through its socket, one at a time.
 
 | `.env` (CI only) | Meaning |
 |---|---|
 | `DOCKER_GID` | The server's docker group (`getent group docker \| cut -d: -f3`), so Jenkins may use the Docker socket |
 | `JENKINS_ADMIN_USER`, `JENKINS_ADMIN_PASSWORD` | The Jenkins admin login |
-| `JENKINS_GITHUB_TOKEN` | GitHub token for this repo: Contents read, Commit statuses read and write, Pull requests read |
+| `JENKINS_GITHUB_TOKEN` | GitHub token for this repo: Contents read, Commit statuses read and write, Pull requests read. It expires; Jenkins stops seeing new commits when it does |
 | `SONAR_DB_PASSWORD` | Password of SonarQube's own Postgres |
-| `SONAR_TOKEN` | Analysis token made in SonarQube after its first start |
+| `SONAR_TOKEN` | Analysis token made in SonarQube (My Account → Security) after its first start. It expires too |
 
 Once on the server, before the first start: `sudo mkdir -p /var/jenkins_home && sudo chown 1000:1000 /var/jenkins_home` (Jenkins's files, at the same path as in the container) and `echo 'vm.max_map_count=524288' | sudo tee /etc/sysctl.d/99-sonarqube.conf && sudo sysctl --system` (SonarQube's search engine).
 
-The smoke test joins the platform's network (`trading-platform_default`) to reach Kafka, so the platform has to be running.
-
 | Item | Value |
 |---|---|
-| Jenkins tools | Maven `Maven3`, SonarQube scanner `Sonar`, server `SonarQube` |
+| Jenkins tools | Maven `Maven3` (in the image), SonarQube server `SonarQube` (`http://sonarqube:9000`, inside Docker's network) |
 | Image | `fintech-five:<branch>` |
-| Smoke test | Throwaway `postgres:17-alpine` + the image with `SPRING_SQL_INIT_MODE=always`, Kafka listeners off (`SPRING_KAFKA_LISTENER_AUTO_STARTUP=false`), dummy market data and JWT secret; waits up to four minutes for `/actuator/health` UP |
+| Smoke test | Throwaway `postgres:17-alpine` + the image with `SPRING_SQL_INIT_MODE=always`, on the platform's network (`trading-platform_default`) for Kafka, with the listeners off (`SPRING_KAFKA_LISTENER_AUTO_STARTUP=false`), dummy market data and JWT secret; waits up to four minutes for `/actuator/health` UP |
 | Static analysis | Checkstyle (`config/checkstyle.xml`) + SpotBugs; new issues mark the build UNSTABLE |
 | Coverage | JaCoCo (`target/site/jacoco/jacoco.xml`) |
-| SonarQube | Project key `fintech-five`, at `http://10.18.64.177:8085` |
+| SonarQube | Project key `fintech-five`, at `https://sonar.f-trade.duckdns.org` (readable without a login) |
 | Reporting tests | pytest in a `python:3.14` container |

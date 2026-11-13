@@ -2,7 +2,7 @@
 
 | Path | What |
 |---|---|
-| [configuration.md](configuration.md) | Ports, Docker Compose services, environment variables, `application.properties`, Kafka topics, CI |
+| [configuration.md](configuration.md) | Where it runs, ports, Docker Compose services, environment variables, `application.properties`, Kafka topics, deploys, CI |
 | [api/](api/) | OpenAPI 3 contracts, one per service area |
 | [diagrams/](diagrams/) | Mermaid sources (`.mmd`) and rendered images (`.png`) |
 
