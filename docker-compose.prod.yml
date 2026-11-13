@@ -1,0 +1,62 @@
+# Changes for running the whole platform on one public server, on top of docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Set HOST_IP=127.0.0.1 in .env, so every port docker-compose.yml publishes (Postgres, Redis, Kafka, the API, auth, the
+# web app and the tools) is only reachable on the server itself. The one thing open to the internet is Caddy, which
+# serves the web app over HTTPS at SITE_DOMAIN and gets its certificate from Let's Encrypt by itself.
+
+# Kafka is reached by its service name, since 127.0.0.1 inside a container is the container itself
+x-kafka-environment: &kafka-environment
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+# the JVM would otherwise allow itself a quarter of the server's memory, four times over
+x-app-environment: &app-environment
+  <<: *kafka-environment
+  JAVA_TOOL_OPTIONS: -Xmx512m
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: trading-caddy
+    depends_on:
+      frontend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?SITE_DOMAIN is not set}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # the certificate, kept so a restart doesn't ask Let's Encrypt for a new one (it limits how many a week)
+      - caddy-data:/data
+    restart: unless-stopped
+
+  kafka:
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_HEAP_OPTS: -Xmx512m -Xms512m
+
+  api:
+    environment: *app-environment
+
+  validation:
+    environment: *app-environment
+
+  recording:
+    environment: *app-environment
+
+  execution:
+    environment: *app-environment
+
+  reporting-consumer:
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+  kafka-ui:
+    environment:
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+
+volumes:
+  caddy-data:
