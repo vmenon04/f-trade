@@ -7,10 +7,12 @@
 
 name: trading-platform
 
-# shared by the four app services: each one only switches its own stage on
+# shared by the four app services: each one only switches its own stage on. Only api builds the image and the other
+# three use what it built (never pulled: the image isn't in any registry). Built once, an unchanged image keeps its
+# ID; built by all four, the tag ended up on a different build every time and compose recreated the containers.
 x-app: &app
-  build: .
   image: trading-platform-app
+  pull_policy: never
   depends_on:
     kafka:
       condition: service_healthy
@@ -54,13 +56,10 @@ x-app-environment: &app-environment
   JWT_SHARED_SECRET: ${JWT_SHARED_SECRET:?JWT_SHARED_SECRET is not set}
 
 # shared by the three reporting services (reporting/Dockerfile): one image, each runs its own script
+# only reporting-api builds it, for the same reason as the app image
 x-reporting: &reporting
-  build:
-    context: ./reporting
-    additional_contexts:
-      # requirements.txt is at the repo root
-      project: .
   image: trading-platform-reporting
+  pull_policy: never
   restart: unless-stopped
 
 x-reporting-environment: &reporting-environment
@@ -237,6 +236,11 @@ services:
   # forwards /api to it. It checks login tokens with the same secret auth-service signs them with
   reporting-api:
     <<: *reporting
+    build:
+      context: ./reporting
+      additional_contexts:
+        # requirements.txt is at the repo root
+        project: .
     container_name: trading-reporting-api
     depends_on:
       postgres:
@@ -374,6 +378,7 @@ services:
   # receives POST /accounts/{accountId}/trades and publishes to trade.submitted
   api:
     <<: *app
+    build: .
     ports:
       - "${HOST_IP:?HOST_IP is not set}:${API_PORT:?API_PORT is not set}:8080"
     environment:
