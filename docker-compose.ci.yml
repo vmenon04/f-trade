@@ -1,0 +1,94 @@
+# Jenkins and SonarQube for the public server, next to the platform (docker-compose.yml + docker-compose.prod.yml):
+#
+#   docker compose -f docker-compose.ci.yml up -d --build
+#
+# Its own compose project, so deploying the platform never restarts them. They join the platform's network, where
+# Caddy serves them at jenkins.SITE_DOMAIN and sonar.SITE_DOMAIN (see Caddyfile) and the pipeline's smoke test finds
+# Kafka, so the platform has to be up first. Values come from the same .env.
+
+name: trading-ci
+
+services:
+  # runs the Jenkinsfile for each branch; set up from ci/jenkins (plugins, settings, logins and the ftrade job)
+  jenkins:
+    build: ./ci/jenkins
+    image: trading-ci-jenkins
+    container_name: trading-jenkins
+    # the docker group of the server (`getent group docker | cut -d: -f3`), to be allowed to use the socket below
+    group_add:
+      - "${DOCKER_GID:?DOCKER_GID is not set}"
+    environment:
+      # no setup wizard: casc.yaml creates the admin login
+      JAVA_OPTS: -Xmx1g -Djenkins.install.runSetupWizard=false
+      SITE_DOMAIN: ${SITE_DOMAIN:?SITE_DOMAIN is not set}
+      JENKINS_ADMIN_USER: ${JENKINS_ADMIN_USER:?JENKINS_ADMIN_USER is not set}
+      JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD:?JENKINS_ADMIN_PASSWORD is not set}
+      JENKINS_GITHUB_TOKEN: ${JENKINS_GITHUB_TOKEN:?JENKINS_GITHUB_TOKEN is not set}
+      # made in SonarQube once it is up, so empty the first time
+      SONAR_TOKEN: ${SONAR_TOKEN:-}
+    volumes:
+      # The same path on the server and in the container: the pipeline starts containers with the server's Docker
+      # and gives them its workspace, which Docker looks for on the server. Create it first, owned by the image's
+      # jenkins user: `sudo mkdir -p /var/jenkins_home && sudo chown 1000:1000 /var/jenkins_home`
+      - /var/jenkins_home:/var/jenkins_home
+      # the server's Docker: builds the image, runs the smoke test and the python container. Whoever controls
+      # Jenkins controls the server through this.
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - platform
+    restart: unless-stopped
+
+  sonarqube:
+    image: sonarqube:26.11.0.134175-community
+    container_name: trading-sonarqube
+    depends_on:
+      sonar-db:
+        condition: service_healthy
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://sonar-db:5432/sonar
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: ${SONAR_DB_PASSWORD:?SONAR_DB_PASSWORD is not set}
+    volumes:
+      - sonarqube-data:/opt/sonarqube/data
+      - sonarqube-extensions:/opt/sonarqube/extensions
+      - sonarqube-logs:/opt/sonarqube/logs
+    # its search engine (Elasticsearch) won't start with the default limits. It also needs, once on the server:
+    # `echo 'vm.max_map_count=524288' | sudo tee /etc/sysctl.d/99-sonarqube.conf && sudo sysctl --system`
+    ulimits:
+      nofile:
+        soft: 131072
+        hard: 131072
+      nproc: 8192
+    networks:
+      - default
+      - platform
+    restart: unless-stopped
+
+  # SonarQube's own database; only SonarQube reaches it
+  sonar-db:
+    image: postgres:16-alpine
+    container_name: trading-sonar-db
+    environment:
+      POSTGRES_DB: sonar
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: ${SONAR_DB_PASSWORD:?SONAR_DB_PASSWORD is not set}
+    volumes:
+      - sonar-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U sonar -d sonar"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+    restart: unless-stopped
+
+networks:
+  # the platform's network, made by its compose project
+  platform:
+    name: trading-platform_default
+    external: true
+
+volumes:
+  sonarqube-data:
+  sonarqube-extensions:
+  sonarqube-logs:
+  sonar-db-data:

@@ -1,0 +1,97 @@
+# Jenkins's whole configuration (Configuration as Code plugin), applied every time it starts. The ${...} values come
+# from the container's environment, which docker-compose.ci.yml fills from .env.
+
+jenkins:
+  systemMessage: "F-Trade CI. Set up from ci/jenkins/casc.yaml: changes made on these pages are lost on a restart."
+  # builds run here, on the server that also runs the platform, so one at a time
+  numExecutors: 1
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "${JENKINS_ADMIN_USER}"
+          password: "${JENKINS_ADMIN_PASSWORD}"
+  authorizationStrategy:
+    globalMatrix:
+      entries:
+        - user:
+            name: "${JENKINS_ADMIN_USER}"
+            permissions:
+              - "Overall/Administer"
+        # anyone can look at builds, test results and coverage (and the README's badge); nothing else
+        - user:
+            name: "anonymous"
+            permissions:
+              - "Overall/Read"
+              - "Job/Read"
+              - "View/Read"
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          # reads the branches and reports each build on its commit (the tick or cross next to it on GitHub)
+          - usernamePassword:
+              scope: GLOBAL
+              id: "github-token"
+              description: "GitHub token for vmenon04/f-trade"
+              username: "vmenon04"
+              password: "${JENKINS_GITHUB_TOKEN}"
+          # empty until a token has been made in SonarQube; only the SonarQube stage needs it
+          - string:
+              scope: GLOBAL
+              id: "sonar-token"
+              description: "SonarQube analysis token"
+              secret: "${SONAR_TOKEN}"
+
+tool:
+  maven:
+    installations:
+      # copied into the image by the Dockerfile
+      - name: "Maven3"
+        home: "/opt/maven"
+
+unclassified:
+  location:
+    # where the links from GitHub and the badge lead
+    url: "https://jenkins.${SITE_DOMAIN}/"
+  sonarGlobalConfiguration:
+    buildWrapperEnabled: true
+    installations:
+      # the name the Jenkinsfile uses (withSonarQubeEnv); reached inside Docker's network, not through Caddy
+      - name: "SonarQube"
+        serverUrl: "http://sonarqube:9000"
+        credentialsId: "sonar-token"
+
+jobs:
+  # A build per branch of the GitHub repo, each from its own Jenkinsfile. Pull requests from forks are never built:
+  # a fork's Jenkinsfile would run as it likes on this server.
+  - script: |
+      multibranchPipelineJob('ftrade') {
+        displayName('F-Trade')
+        branchSources {
+          github {
+            id('ftrade')
+            scanCredentialsId('github-token')
+            repoOwner('vmenon04')
+            repository('f-trade')
+            buildOriginBranch(true)
+            buildOriginBranchWithPR(true)
+            buildOriginPRHead(false)
+            buildOriginPRMerge(false)
+            buildForkPRHead(false)
+            buildForkPRMerge(false)
+          }
+        }
+        // look for new commits every five minutes: GitHub can't be told to call a Jenkins it may not reach
+        triggers {
+          periodicFolderTrigger {
+            interval('5m')
+          }
+        }
+        orphanedItemStrategy {
+          discardOldItems {
+            numToKeep(5)
+          }
+        }
+      }

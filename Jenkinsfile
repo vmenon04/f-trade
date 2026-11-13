@@ -35,7 +35,8 @@ def SonarQube() {
 def SmokeTest() {
     // starts the image and waits for /actuator/health to report UP. application.properties isn't in git, so the
     // settings are passed as environment variables. The database is a throwaway Postgres container, never the shared
-    // one, because startup drops the tables and reloads the sample data. Kafka is the team broker, but with the
+    // one, because startup drops the tables and reloads the sample data. Kafka is the platform's own broker, which
+    // the container reaches by joining the platform's network (docker-compose.yml on this server), but with the
     // listeners off so the smoke test doesn't consume (and act on) real trade messages.
     def safeTag = getSafeTag()
     def name = "smoke-${safeTag}-${env.BUILD_NUMBER}"
@@ -44,13 +45,14 @@ def SmokeTest() {
         sh "docker run -d --name ${name}-db --network ${name} -e POSTGRES_DB=trading -e POSTGRES_USER=trading -e POSTGRES_PASSWORD=smoke postgres:17-alpine"
         // -h 127.0.0.1: during its first start the image runs a temporary server without TCP, so this waits for the real one
         sh "for i in \$(seq 30); do docker exec ${name}-db pg_isready -h 127.0.0.1 -U trading -d trading && exit 0; sleep 2; done; exit 1"
-        sh """docker run -d --name ${name}-app --network ${name} \\
+        // created first and started below, so it is on both networks before it looks for Kafka
+        sh """docker create --name ${name}-app --network ${name} \\
             -e SPRING_DATASOURCE_URL=jdbc:postgresql://${name}-db:5432/trading \\
             -e SPRING_DATASOURCE_USERNAME=trading \\
             -e SPRING_DATASOURCE_PASSWORD=smoke \\
             -e SPRING_SQL_INIT_MODE=always \\
             -e SPRING_SQL_INIT_DATA_LOCATIONS=classpath:sample-data.sql \\
-            -e SPRING_KAFKA_BOOTSTRAP_SERVERS=10.18.64.177:9092 \\
+            -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \\
             -e SPRING_KAFKA_LISTENER_AUTO_STARTUP=false \\
             -e MARKET_DATA_BASE_URL=http://localhost:1 \\
             -e MARKET_DATA_API_KEY=smoke-test \\
@@ -58,12 +60,14 @@ def SmokeTest() {
             -e MANAGEMENT_HEALTH_REDIS_ENABLED=false \\
             -e JWT_SHARED_SECRET=smoke-test-secret-at-least-32-characters \\
             fintech-five:${safeTag}"""
+        sh "docker network connect trading-platform_default ${name}-app"
+        sh "docker start ${name}-app"
         // stops as soon as the app container exits (it failed to start), rather than waiting out the timeout
-        sh """for i in \$(seq 45); do
+        sh """for i in \$(seq 120); do
                 [ "\$(docker inspect -f '{{.State.Running}}' ${name}-app)" = true ] || { echo 'App container exited during startup'; exit 1; }
                 docker exec ${name}-app wget -qO- http://localhost:8080/actuator/health 2>/dev/null | grep -q '"status":"UP"' && exit 0
                 sleep 2
-            done; echo 'App did not report UP within 90 seconds'; exit 1"""
+            done; echo 'App did not report UP within 4 minutes'; exit 1"""
     } finally {
         // the app's log shows why it failed to start
         sh "docker logs ${name}-app || true"
