@@ -29,7 +29,9 @@ When developing on your own machine:
 | Port | What |
 |---|---|
 | 8050 | Reporting API run by hand (`reporting/scripts/api.py`, 127.0.0.1) |
-| 4200 | platform-ui dev server (`ng serve`): proxies `/v1` and `/auth` to the machine running compose (`BACKEND_HOST`, see `platform-ui/proxy.conf.mjs`) and `/api` to 8050 (`REPORTING_HOST` / `REPORTING_PORT`) |
+| 4200 | platform-ui dev server (`ng serve`): proxies `/v1` and `/auth` to the machine running compose (`HOST_IP` from the root `.env`, or `BACKEND_HOST`; see `platform-ui/proxy.conf.mjs`) and `/api` to 8050 (`REPORTING_HOST` / `REPORTING_PORT`) |
+
+The Bruno collection (`../bruno`) has two environments: `public` (the public server) and `local` (`127.0.0.1:8081` and `:8084`: on the server itself, through an SSH forward, or change them to your `HOST_IP`).
 
 ## Docker Compose
 

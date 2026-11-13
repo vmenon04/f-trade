@@ -101,7 +101,8 @@ services:
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      # the address clients are told to reconnect to: must be reachable from the VM and Jenkins, never localhost
+      # the address clients are told to reconnect to: must be reachable from the other containers and from an app run
+      # outside Docker, so never localhost (docker-compose.prod.yml advertises the service name instead)
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${HOST_IP:?HOST_IP is not set}:9092
       # one broker, so every internal topic has one replica
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -156,7 +157,7 @@ services:
     volumes:
       - redis-data:/data
     ports:
-      # published like Postgres, so the app can use it when run on the VM
+      # published like Postgres, so the app can use it when run outside Docker
       - "${HOST_IP:?HOST_IP is not set}:${REDIS_PORT:?REDIS_PORT is not set}:6379"
     environment:
       # read by redis-cli, so the healthcheck can log in without the password on its command line
