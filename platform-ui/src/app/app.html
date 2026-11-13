@@ -1,7 +1,11 @@
 @if (plain.on()) {
   <p>
     <b>F-Trade</b>, the plain HTML edition.
-    <button type="button" (click)="plain.toggle()">Switch to the modern site</button>
+    @if (plain.always) {
+      <a [href]="plain.modernUrl()">Go to the modern site</a>
+    } @else {
+      <button type="button" (click)="plain.toggle()">Switch to the modern site</button>
+    }
   </p>
   <hr>
 }
@@ -16,8 +20,4 @@
       <router-outlet></router-outlet>
     </main>
   </div>
-}
-@if (!plain.on()) {
-  <button type="button" class="style-toggle" [class.left]="landing()" (click)="plain.toggle()"
-    title="Switch to the plain HTML version of the site">Plain HTML</button>
 }

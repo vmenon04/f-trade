@@ -4,6 +4,9 @@ import { PlainStyleService } from '../../services/plain-style.service';
 import { FrogGame, SceneView } from './frog-game';
 import { CANOPY, FAR_PINES, FROG, GRASS, MID_PINES, TRUNKS } from './landing-scene';
 
+// how many quick clicks on the frog switch between the two versions of the site
+export const FROG_CLICKS = 5;
+
 // the logo frog, eyeing a money fly
 const ASCII_FROG = String.raw`
                                         $
@@ -43,6 +46,8 @@ export class Landing implements OnInit, OnDestroy {
   private host = inject<ElementRef<HTMLElement>>(ElementRef);
   private frame = 0;
   private ribbitTimer?: ReturnType<typeof setTimeout>;
+  private frogClicks = 0;
+  private frogClickTimer?: ReturnType<typeof setTimeout>;
   private last: number | null = null;
   private readonly onResize = () => this.fitToScreen();
 
@@ -68,6 +73,7 @@ export class Landing implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     clearTimeout(this.ribbitTimer);
+    clearTimeout(this.frogClickTimer);
     if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this.frame);
     if (typeof removeEventListener === 'function') removeEventListener('resize', this.onResize);
   }
@@ -87,6 +93,21 @@ export class Landing implements OnInit, OnDestroy {
     this.ribbiting.set(true);
     clearTimeout(this.ribbitTimer);
     this.ribbitTimer = setTimeout(() => this.ribbiting.set(false), 1600);
+    this.countFrogClick();
+  }
+
+  // Hidden: five quick clicks on the frog switch to the plain HTML version of the site, and five on the frog
+  // drawn in text switch back (like the navbar logo's five clicks)
+  protected countFrogClick(): void {
+    clearTimeout(this.frogClickTimer);
+    this.frogClicks++;
+    if (this.frogClicks >= FROG_CLICKS) {
+      this.frogClicks = 0;
+      this.ribbiting.set(false);
+      this.plain.toggle();
+      return;
+    }
+    this.frogClickTimer = setTimeout(() => (this.frogClicks = 0), 1500);
   }
 
   protected togglePause(): void {

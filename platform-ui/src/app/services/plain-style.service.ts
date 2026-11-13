@@ -1,6 +1,7 @@
 import { DOCUMENT, Injectable, inject, signal } from '@angular/core';
 
-const STORAGE_KEY = 'ftrade.plain';
+// the plain site's own address is the site's, with this in front: retro.f-trade.duckdns.org
+const RETRO_LABEL = 'retro';
 const SHEET_ID = 'plain-style';
 // marks the style sheets this service switched off, so it switches the same ones back on
 const SWITCHED_OFF = 'data-plain-off';
@@ -25,36 +26,38 @@ th, td { border: 1px solid; padding: 2px 8px; text-align: left; }
 }
 `;
 
+/** Whether a host name is the plain site's own address, e.g. retro.f-trade.duckdns.org or retro.localhost. */
+export function isRetroHost(hostname: string): boolean {
+  return hostname.toLowerCase().startsWith(`${RETRO_LABEL}.`);
+}
+
 // The plain HTML version of the site: every style sheet switched off, so the same pages are drawn the way a
-// browser draws bare HTML, plus the few rules above. The choice is kept in the browser, per visitor.
+// browser draws bare HTML, plus the few rules above. It has an address of its own, where it is always on. On the
+// site's usual address it is a hidden extra (the landing page's frog switches it), and off again after a reload.
 @Injectable({ providedIn: 'root' })
 export class PlainStyleService {
   private readonly doc = inject(DOCUMENT);
   private observer?: MutationObserver;
 
-  readonly on = signal(this.stored());
+  /** On the plain site's own address, where there is nothing to switch. */
+  readonly always = isRetroHost(this.doc.location?.hostname ?? '');
+  readonly on = signal(this.always);
 
   constructor() {
     this.apply(this.on());
   }
 
+  /** The same page on the site's usual address, for the way back from the plain site's own. */
+  modernUrl(): string {
+    const { protocol, host, pathname, search } = this.doc.location;
+    return `${protocol}//${host.slice(RETRO_LABEL.length + 1)}${pathname}${search}`;
+  }
+
   toggle(): void {
+    if (this.always) return;
     const on = !this.on();
     this.on.set(on);
     this.apply(on);
-    try {
-      localStorage.setItem(STORAGE_KEY, String(on));
-    } catch {
-      // no storage (private browsing): the choice lasts until the page is reloaded
-    }
-  }
-
-  private stored(): boolean {
-    try {
-      return localStorage.getItem(STORAGE_KEY) === 'true';
-    } catch {
-      return false;
-    }
   }
 
   private apply(on: boolean): void {
@@ -90,6 +93,13 @@ export class PlainStyleService {
     for (const sheet of this.sheets(`:not([id]):not([${SWITCHED_OFF}])`)) {
       sheet.disabled = true;
       sheet.setAttribute(SWITCHED_OFF, '');
+      // a style sheet file that is still on its way is switched back on by the browser when it arrives, which is
+      // what happens to the site's main one on a first visit to the plain site's address
+      if (sheet instanceof HTMLLinkElement && !sheet.sheet) {
+        sheet.addEventListener('load', () => {
+          if (this.on()) sheet.disabled = true;
+        }, { once: true });
+      }
     }
   }
 

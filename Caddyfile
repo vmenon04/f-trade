@@ -5,6 +5,13 @@
 	reverse_proxy frontend:80
 }
 
+# The same web app under a second name, where it shows its plain HTML version: the app looks at the name it was
+# opened with (platform-ui's PlainStyleService).
+retro.{$SITE_DOMAIN} {
+	encode gzip
+	reverse_proxy frontend:80
+}
+
 # Jenkins and SonarQube (docker-compose.ci.yml), each under its own name. Any name ending in SITE_DOMAIN leads to this
 # server when it is a duckdns.org name. Until they are started, these two just answer 502.
 jenkins.{$SITE_DOMAIN} {

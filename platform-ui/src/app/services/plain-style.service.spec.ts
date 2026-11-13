@@ -1,18 +1,21 @@
 import { TestBed } from '@angular/core/testing';
-import { vi } from 'vitest';
-import { PlainStyleService } from './plain-style.service';
+import { PlainStyleService, isRetroHost } from './plain-style.service';
+
+describe('isRetroHost', () => {
+  it('is the site\'s address with retro in front', () => {
+    expect(isRetroHost('retro.f-trade.duckdns.org')).toBe(true);
+    expect(isRetroHost('retro.localhost')).toBe(true);
+    expect(isRetroHost('f-trade.duckdns.org')).toBe(false);
+    expect(isRetroHost('jenkins.f-trade.duckdns.org')).toBe(false);
+    expect(isRetroHost('localhost')).toBe(false);
+  });
+});
 
 describe('PlainStyleService', () => {
   let siteSheet: HTMLStyleElement;
   let otherSheet: HTMLStyleElement;
 
   beforeEach(() => {
-    // the test runner has no localStorage of its own
-    const stored = new Map<string, string>();
-    vi.stubGlobal('localStorage', {
-      getItem: (key: string) => stored.get(key) ?? null,
-      setItem: (key: string, value: string) => void stored.set(key, value),
-    });
     siteSheet = document.head.appendChild(document.createElement('style'));
     // e.g. one a browser extension added
     otherSheet = document.head.appendChild(document.createElement('style'));
@@ -24,11 +27,12 @@ describe('PlainStyleService', () => {
     if (service.on()) service.toggle();
     siteSheet.remove();
     otherSheet.remove();
-    vi.unstubAllGlobals();
   });
 
-  it('starts as the modern site', () => {
-    expect(TestBed.inject(PlainStyleService).on()).toBe(false);
+  it('starts as the modern site on the usual address', () => {
+    const service = TestBed.inject(PlainStyleService);
+    expect(service.always).toBe(false);
+    expect(service.on()).toBe(false);
     expect(document.documentElement.classList.contains('plain')).toBe(false);
     expect(document.getElementById('plain-style')).toBeNull();
   });
@@ -52,6 +56,20 @@ describe('PlainStyleService', () => {
     late.remove();
   });
 
+  it('switches a style sheet file off again when it arrives after the switch', () => {
+    const link = document.head.appendChild(document.createElement('link'));
+    link.rel = 'stylesheet';
+    TestBed.inject(PlainStyleService).toggle();
+    expect(link.hasAttribute('data-plain-off')).toBe(true);
+
+    // what the browser does when the file has loaded
+    link.disabled = false;
+    link.dispatchEvent(new Event('load'));
+
+    expect(link.disabled).toBe(true);
+    link.remove();
+  });
+
   it('puts everything back', () => {
     const service = TestBed.inject(PlainStyleService);
     service.toggle();
@@ -61,13 +79,5 @@ describe('PlainStyleService', () => {
     expect(document.documentElement.classList.contains('plain')).toBe(false);
     expect(siteSheet.hasAttribute('data-plain-off')).toBe(false);
     expect(document.getElementById('plain-style')).toBeNull();
-  });
-
-  it('remembers the choice', () => {
-    TestBed.inject(PlainStyleService).toggle();
-    expect(localStorage.getItem('ftrade.plain')).toBe('true');
-
-    TestBed.resetTestingModule();
-    expect(TestBed.inject(PlainStyleService).on()).toBe(true);
   });
 });
