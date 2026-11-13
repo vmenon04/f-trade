@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { PlainStyleService } from '../../services/plain-style.service';
 import { FLY_COUNT, FrogGame } from './frog-game';
 import { Landing } from './landing';
 
@@ -32,6 +33,21 @@ describe('Landing', () => {
     fixture.nativeElement.querySelector('g.frog').dispatchEvent(new MouseEvent('click'));
     await fixture.whenStable();
     expect(fixture.nativeElement.querySelector('.ribbit').textContent).toContain('Ribbit');
+  });
+
+  it('draws the frog in text on the plain HTML version, with the same links', async () => {
+    const plain = TestBed.inject(PlainStyleService);
+    plain.toggle();
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector('svg')).toBeNull();
+    expect(fixture.nativeElement.querySelector('pre').textContent).toContain('(o)-------(o)');
+    const hrefs = Array.from(fixture.nativeElement.querySelectorAll('a') as NodeListOf<HTMLAnchorElement>)
+      .map((a) => a.getAttribute('href'));
+    expect(hrefs).toContain('/login');
+    expect(hrefs).toContain('/registration');
+
+    plain.toggle();
   });
 });
 

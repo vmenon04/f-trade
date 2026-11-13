@@ -1,6 +1,7 @@
-import { Component, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
 import { Navbar } from './components/navbar/navbar';
+import { PlainStyleService } from './services/plain-style.service';
 
 @Component({
   selector: 'app-root',
@@ -10,6 +11,8 @@ import { Navbar } from './components/navbar/navbar';
 })
 export class App {
   protected readonly title = signal('platform-ui');
+  // the plain HTML version of the site, switched on and off from every page
+  protected readonly plain = inject(PlainStyleService);
 
   constructor(protected readonly router: Router) {}
 
@@ -17,5 +20,10 @@ export class App {
   protected fullPage(): boolean {
     const path = this.router.url.split(/[?#]/)[0];
     return path === '/' || path.startsWith('/login') || path.startsWith('/registration');
+  }
+
+  // the landing page has its pause button in the corner the switch normally sits in
+  protected landing(): boolean {
+    return this.router.url.split(/[?#]/)[0] === '/';
   }
 }

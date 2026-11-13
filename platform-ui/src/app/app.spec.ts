@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { Component } from '@angular/core';
 import { provideRouter, Router } from '@angular/router';
 import { App } from './app';
+import { PlainStyleService } from './services/plain-style.service';
 
 @Component({ template: '' })
 class Blank {}
@@ -36,5 +37,23 @@ describe('App', () => {
     await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('app-navbar')).toBeNull();
+  });
+
+  it('should switch to the plain HTML version and back from any page', async () => {
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const plain = TestBed.inject(PlainStyleService);
+
+    (compiled.querySelector('button.style-toggle') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    expect(plain.on()).toBe(true);
+    expect(compiled.querySelector('button.style-toggle')).toBeNull();
+
+    const back = Array.from(compiled.querySelectorAll('button')).find((b) => b.textContent?.includes('modern site'));
+    back!.click();
+    await fixture.whenStable();
+    expect(plain.on()).toBe(false);
+    expect(compiled.querySelector('button.style-toggle')).toBeTruthy();
   });
 });

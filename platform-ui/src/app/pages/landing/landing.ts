@@ -1,7 +1,24 @@
 import { Component, ElementRef, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { PlainStyleService } from '../../services/plain-style.service';
 import { FrogGame, SceneView } from './frog-game';
 import { CANOPY, FAR_PINES, FROG, GRASS, MID_PINES, TRUNKS } from './landing-scene';
+
+// the logo frog, eyeing a money fly
+const ASCII_FROG = String.raw`
+                                        $
+          _         _                 \ | /
+         (o)-------(o)              ~~(_$_)~~
+      .-'             '-.
+     /   \___________/   \
+    |                     |          ribbit.
+    |    .           .    |
+   _ \    '.       .'    / _
+  / '-\     '-----'     /-' \
+ |  |  '-.___________.-'  |  |
+ /__|\__\               /__/|__\
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+`;
 
 // The public front page: the logo frog catching money flies, what the platform does, and links to log in or
 // sign up. Logged-in users never see it; landingGuard sends them to their own home page.
@@ -13,6 +30,9 @@ import { CANOPY, FAR_PINES, FROG, GRASS, MID_PINES, TRUNKS } from './landing-sce
 })
 export class Landing implements OnInit, OnDestroy {
   protected readonly art = { FAR_PINES, MID_PINES, TRUNKS, CANOPY, GRASS, FROG };
+  // on the plain HTML version of the site the scene is a drawing in text instead
+  protected readonly plain = inject(PlainStyleService);
+  protected readonly asciiFrog = ASCII_FROG;
 
   private game = new FrogGame();
   // a signal, so each animation frame re-renders the scene (the app runs without zone.js)
@@ -39,7 +59,7 @@ export class Landing implements OnInit, OnDestroy {
       this.frame = requestAnimationFrame(tick);
       const dt = this.last === null ? 0 : Math.min(0.05, (now - this.last) / 1000);
       this.last = now;
-      if (this.paused()) return;
+      if (this.paused() || this.plain.on()) return;
       this.game.step(dt);
       this.scene.set(this.game.view());
     };

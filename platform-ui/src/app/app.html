@@ -1,11 +1,23 @@
+@if (plain.on()) {
+  <p>
+    <b>F-Trade</b>, the plain HTML edition.
+    <button type="button" (click)="plain.toggle()">Switch to the modern site</button>
+  </p>
+  <hr>
+}
 @if (fullPage()) {
   <main class="auth-content"><router-outlet></router-outlet></main>
 } @else {
   <div class="app-shell">
     <app-navbar></app-navbar>
+    @if (plain.on()) { <hr> }
     <main class="app-content">
       <p class="simulated-notice">Demo: prices are simulated, not real market data.</p>
       <router-outlet></router-outlet>
     </main>
   </div>
+}
+@if (!plain.on()) {
+  <button type="button" class="style-toggle" [class.left]="landing()" (click)="plain.toggle()"
+    title="Switch to the plain HTML version of the site">Plain HTML</button>
 }

@@ -24,3 +24,31 @@
 	text-align: center;
 	color: var(--muted);
 }
+
+/* the switch to the plain HTML version: small, in a corner of every page */
+.style-toggle {
+	position: fixed;
+	right: 14px;
+	bottom: 14px;
+	z-index: 40;
+	padding: 5px 12px;
+	border: 2px solid var(--ink);
+	border-radius: 999px;
+	background: var(--surface);
+	color: var(--ink);
+	font-family: var(--font-numeric);
+	font-size: 0.7rem;
+	cursor: pointer;
+	opacity: 0.7;
+}
+
+.style-toggle.left {
+	right: auto;
+	left: 14px;
+}
+
+.style-toggle:hover,
+.style-toggle:focus-visible {
+	opacity: 1;
+	background: var(--green-soft);
+}
