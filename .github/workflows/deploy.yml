@@ -1,0 +1,52 @@
+# Deploys main to the public server: logs in over SSH, pulls the new commit and lets compose rebuild and restart
+# whatever changed. The images are built on the server, so nothing is pushed to a registry.
+#
+# Needs three repository secrets (Settings -> Secrets and variables -> Actions):
+#   DEPLOY_HOST         the server's public IP
+#   DEPLOY_SSH_KEY      a private key whose public half is in ~/.ssh/authorized_keys of the server's ubuntu user
+#   DEPLOY_KNOWN_HOSTS  the server's host key, from `ssh-keyscan -t ed25519 <the IP>`, so the runner knows it is
+#                       talking to the right machine
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  # also from the Actions tab, to deploy again without a new commit
+  workflow_dispatch:
+
+# one deploy at a time; a second push waits for the first to finish rather than cutting it off halfway
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Set up SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Pull and restart on the server
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        # --wait fails the job unless every service comes back healthy
+        run: |
+          ssh -i ~/.ssh/deploy_key "ubuntu@$DEPLOY_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          cd ~/f-trade
+          git pull --ff-only origin main
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait
+          # old images pile up with every rebuild
+          docker image prune -f
+          REMOTE
