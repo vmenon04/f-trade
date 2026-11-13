@@ -26,6 +26,10 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # lists each run under Deployments on the repo's page, with a link to the site
+    environment:
+      name: production
+      url: https://f-trade.duckdns.org
     steps:
       - name: Set up SSH
         env:
