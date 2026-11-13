@@ -1,0 +1,6 @@
+# Used by docker-compose.prod.yml: HTTPS for the web app at SITE_DOMAIN (from .env), with http:// redirected to it.
+# The frontend's nginx forwards /v1, /auth and /api to the services behind it.
+{$SITE_DOMAIN} {
+	encode gzip
+	reverse_proxy frontend:80
+}

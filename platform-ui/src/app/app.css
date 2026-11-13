@@ -16,3 +16,11 @@
 		display: block;
 	}
 }
+
+.simulated-notice {
+	margin: 0;
+	padding: 6px 16px;
+	font-size: 12px;
+	text-align: center;
+	color: var(--muted);
+}
